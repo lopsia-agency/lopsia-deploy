@@ -1,2 +1,16 @@
 .env
 *.env.local
+
+# Secrets & credentials (jamais committer)
+.env.bak*
+*.env.local
+*-cred-soc.json
+n8n-credentials*.json
+letsencrypt/
+data/
+config/
+
+# Backups locaux
+docker-compose.yml.bak*
+traefik/*.bak*
+*.bak.*

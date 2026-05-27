@@ -5,26 +5,109 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - ./traefik/traefik.yml:/etc/traefik/traefik.yml
       - /var/run/docker.sock:/var/run/docker.sock
 
-  n8n:
+  n8n-saas:
     image: n8nio/n8n
-    container_name: n8n
+    container_name: n8n-saas
     restart: unless-stopped
     environment:
-      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
-      - N8N_BASIC_AUTH_ACTIVE=true
-      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER}
-      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD}
-      - WEBHOOK_URL=https://n8n.${DOMAIN}
+      - N8N_ENCRYPTION_KEY=${N8N_SAAS_ENCRYPTION_KEY}
+      - WEBHOOK_URL=https://n8n-saas.lopsia.fr
+      - N8N_INTERNAL_SECRET=${N8N_INTERNAL_SECRET:-}
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+      - NODE_FUNCTION_ALLOW_BUILTIN=*
+      - EXECUTIONS_DATA_SAVE_ON_ERROR=all
+      - N8N_HOST=n8n-saas.lopsia.fr
+      - N8N_PROTOCOL=https
+      - N8N_PROXY_HOPS=1
+      - N8N_RUNNERS_ENABLED=true
+      - NODE_OPTIONS=--dns-result-order=ipv4first
+      - GENERIC_TIMEZONE=Europe/Paris
     volumes:
-      - n8n_data:/home/node/.n8n
+      - n8n_saas_data:/home/node/.n8n
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.n8n.rule=Host(`n8n.${DOMAIN}`)"
-      - "traefik.http.services.n8n.loadbalancer.server.port=5678"
+      - "traefik.http.routers.n8n-saas.rule=Host(`n8n-saas.lopsia.fr`)"
+      - "traefik.http.routers.n8n-saas.entrypoints=websecure"
+      - "traefik.http.routers.n8n-saas.tls=true"
+      - "traefik.http.services.n8n-saas.loadbalancer.server.port=5678"
+
+
+  ticketsafe:
+    image: lopsia/ticketsafe:latest
+    container_name: ticketsafe
+    restart: unless-stopped
+    environment:
+      - N8N_BASE_URL=http://n8n-saas:5678
+      - N8N_WEBHOOK_URL=http://n8n-saas:5678/webhook/scan-receipt
+      - N8N_FEEDBACK_WEBHOOK_URL=http://n8n-saas:5678/webhook/tks-feedback
+      - TICKETSAFE_ADMIN_EMAIL=app2023.mc.fr@gmail.com
+      - PORT=80
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - SUPABASE_URL=${SUPABASE_URL_UFP}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY_UFP}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+      - LOPSIA_ADMIN=${LOPSIA_ADMIN}
+      - LOPSIA_SAAS_ADMIN=${LOPSIA_SAAS_ADMIN}
+      - GITHUB_APP_ID=${GITHUB_APP_ID:-}
+      - GITHUB_APP_SLUG=${GITHUB_APP_SLUG:-vibesafe-deep-scan}
+      - GITHUB_APP_PRIVATE_KEY=${GITHUB_APP_PRIVATE_KEY:-}
+      - GITHUB_APP_CLIENT_ID=${GITHUB_APP_CLIENT_ID:-}
+      - GITHUB_APP_CLIENT_SECRET=${GITHUB_APP_CLIENT_SECRET:-}
+      - GITHUB_APP_WEBHOOK_SECRET=${GITHUB_APP_WEBHOOK_SECRET:-}
+      - GITHUB_APP_INSTALL_URL=${GITHUB_APP_INSTALL_URL:-}
+      - N8N_INTERNAL_SECRET=${N8N_INTERNAL_SECRET:-}
+      - GITHUB_STATE_SECRET=${GITHUB_STATE_SECRET:-}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ticketsafe.rule=Host(`ticketsafe.lopsia.fr`)"
+      - "traefik.http.routers.ticketsafe.entrypoints=websecure"
+      - "traefik.http.routers.ticketsafe.tls=true"
+      - "traefik.http.services.ticketsafe.loadbalancer.server.port=80"
+
+
+  vibesafe:
+    image: lopsia/vibesafe:latest
+    container_name: vibesafe
+    restart: unless-stopped
+    environment:
+      - N8N_BASE_URL=http://n8n-saas:5678
+      - N8N_WEBHOOK_URL=http://n8n-saas:5678/webhook/vibesafe-scan
+      - N8N_FEEDBACK_WEBHOOK_URL=http://n8n-saas:5678/webhook/vibesafe-feedback
+      - PORT=80
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET_VIBESAFE:-${STRIPE_WEBHOOK_SECRET}}
+      - STRIPE_PRICE_VIBESAFE_SOLO=${STRIPE_PRICE_VIBESAFE_SOLO:-}
+      - STRIPE_PRICE_VIBESAFE_STUDIO=${STRIPE_PRICE_VIBESAFE_STUDIO:-}
+      - STRIPE_PRICE_VIBESAFE_AGENCE=${STRIPE_PRICE_VIBESAFE_AGENCE:-}
+      - STRIPE_CHECKOUT_DISABLED=${STRIPE_CHECKOUT_DISABLED:-false}
+      - SUPABASE_URL=${SUPABASE_URL_UFP}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY_UFP}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+      - LOPSIA_ADMIN=${LOPSIA_ADMIN}
+      - LOPSIA_SAAS_ADMIN=${LOPSIA_SAAS_ADMIN}
+      - GITHUB_APP_ID=${GITHUB_APP_ID:-}
+      - GITHUB_APP_SLUG=${GITHUB_APP_SLUG:-vibesafe-deep-scan}
+      - GITHUB_APP_PRIVATE_KEY=${GITHUB_APP_PRIVATE_KEY:-}
+      - GITHUB_APP_CLIENT_ID=${GITHUB_APP_CLIENT_ID:-}
+      - GITHUB_APP_CLIENT_SECRET=${GITHUB_APP_CLIENT_SECRET:-}
+      - GITHUB_APP_WEBHOOK_SECRET=${GITHUB_APP_WEBHOOK_SECRET:-}
+      - GITHUB_APP_INSTALL_URL=${GITHUB_APP_INSTALL_URL:-}
+      - N8N_INTERNAL_SECRET=${N8N_INTERNAL_SECRET:-}
+      - GITHUB_STATE_SECRET=${GITHUB_STATE_SECRET:-}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.vibesafe.rule=Host(`vibesafe.lopsia.fr`)"
+      - "traefik.http.routers.vibesafe.entrypoints=websecure"
+      - "traefik.http.routers.vibesafe.tls=true"
+      - "traefik.http.services.vibesafe.loadbalancer.server.port=80"
+
 
 volumes:
   n8n_data:
+  n8n_saas_data:
